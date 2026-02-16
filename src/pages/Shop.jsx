@@ -1,78 +1,101 @@
-import { useState, useMemo } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { FaFilter, FaSortAmountDown } from 'react-icons/fa';
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import medicines from '../data/medicines.json';
 import { useCart } from '../context/CartContext';
 
 const Shop = () => {
-    const [searchParams] = useSearchParams();
-    const categoryParam = searchParams.get('category');
-    const searchParam = searchParams.get('search');
-
-    const [selectedCategory, setSelectedCategory] = useState(categoryParam || 'All');
-    const [priceRange, setPriceRange] = useState([0, 1000]);
-    const [sortBy, setSortBy] = useState('popularity');
     const { addToCart } = useCart();
+    const [selectedCategory, setSelectedCategory] = useState('All');
+    const [priceRange, setPriceRange] = useState([0, 1000]);
+    const [sortBy, setSortBy] = useState('popular');
+    const [searchQuery, setSearchQuery] = useState('');
 
     const categories = ['All', ...new Set(medicines.map(m => m.category))];
 
-    const filteredProducts = useMemo(() => {
-        return medicines
-            .filter(product => {
-                const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
-                const matchesSearch = !searchParam || product.name.toLowerCase().includes(searchParam.toLowerCase());
-                const matchesPrice = product.price >= priceRange[0] && product.price <= priceRange[1];
-                return matchesCategory && matchesSearch && matchesPrice;
-            })
-            .sort((a, b) => {
-                if (sortBy === 'price-low') return a.price - b.price;
-                if (sortBy === 'price-high') return b.price - a.price;
-                if (sortBy === 'popularity') return b.reviews - a.reviews;
-                return 0;
-            });
-    }, [selectedCategory, searchParam, priceRange, sortBy]);
+    const filterMedicines = () => {
+        let filtered = medicines;
+
+        // Category filter
+        if (selectedCategory !== 'All') {
+            filtered = filtered.filter(m => m.category === selectedCategory);
+        }
+
+        // Price filter
+        filtered = filtered.filter(m => m.price >= priceRange[0] && m.price <= priceRange[1]);
+
+        // Search filter
+        if (searchQuery) {
+            filtered = filtered.filter(m =>
+                m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                m.brand.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+        }
+
+        // Sort
+        if (sortBy === 'price-low') filtered.sort((a, b) => a.price - b.price);
+        else if (sortBy === 'price-high') filtered.sort((a, b) => b.price - a.price);
+        else if (sortBy === 'name') filtered.sort((a, b) => a.name.localeCompare(b.name));
+        else filtered.sort((a, b) => b.rating - a.rating);
+
+        return filtered;
+    };
+
+    const filteredProducts = filterMedicines();
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div className="flex flex-col md:flex-row gap-8">
-                {/* Sidebar Filters */}
-                <div className="w-full md:w-64 space-y-8">
-                    <div>
-                        <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                            <FaFilter className="text-primary" /> Filters
-                        </h3>
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">Shop Medicines</h1>
+            <p className="text-gray-600 mb-8">Browse our wide range of authentic medicines</p>
+
+            <div className="flex flex-col lg:flex-row gap-8">
+                {/* Filters Sidebar */}
+                <div className="lg:w-1/4">
+                    <div className="bg-white p-6 rounded-2xl shadow-md border-2 border-gray-100 sticky top-4">
+                        <h3 className="text-lg font-bold mb-4 text-gray-900">Filters</h3>
+
+                        {/* Search */}
+                        <div className="mb-6">
+                            <label className="block text-sm font-semibold mb-2">Search</label>
+                            <input
+                                type="text"
+                                placeholder="Search medicines..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-primary"
+                            />
+                        </div>
 
                         {/* Category Filter */}
                         <div className="mb-6">
-                            <h4 className="font-medium mb-3">Category</h4>
+                            <h4 className="font-semibold mb-3">Category</h4>
                             <div className="space-y-2">
                                 {categories.map(cat => (
-                                    <label key={cat} className="flex items-center space-x-2 cursor-pointer">
-                                        <input
-                                            type="radio"
-                                            name="category"
-                                            checked={selectedCategory === cat}
-                                            onChange={() => setSelectedCategory(cat)}
-                                            className="text-primary focus:ring-primary h-4 w-4"
-                                        />
-                                        <span className="text-gray-700">{cat}</span>
-                                    </label>
+                                    <button
+                                        key={cat}
+                                        onClick={() => setSelectedCategory(cat)}
+                                        className={`w-full text-left px-4 py-2 rounded-lg transition-all ${selectedCategory === cat
+                                                ? 'bg-primary text-white font-semibold shadow-md'
+                                                : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                                            }`}
+                                    >
+                                        {cat}
+                                    </button>
                                 ))}
                             </div>
                         </div>
 
                         {/* Price Filter */}
                         <div>
-                            <h4 className="font-medium mb-3">Price Range</h4>
+                            <h4 className="font-semibold mb-3">Price Range</h4>
                             <input
                                 type="range"
                                 min="0"
-                                max="100"
+                                max="1000"
                                 value={priceRange[1]}
                                 onChange={(e) => setPriceRange([0, parseInt(e.target.value)])}
                                 className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
                             />
-                            <div className="flex justify-between text-sm text-gray-600 mt-2">
+                            <div className="flex justify-between text-sm text-gray-600 mt-2 font-semibold">
                                 <span>₹0</span>
                                 <span>₹{priceRange[1]}</span>
                             </div>
@@ -80,65 +103,97 @@ const Shop = () => {
                     </div>
                 </div>
 
-                {/* Product Grid */}
-                <div className="flex-1">
-                    <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-2xl font-bold text-gray-900">
-                            {selectedCategory === 'All' ? 'All Medicines' : selectedCategory}
-                            <span className="text-sm font-normal text-gray-500 ml-2">
-                                ({filteredProducts.length} items)
-                            </span>
-                        </h2>
-
-                        <div className="flex items-center gap-2">
-                            <FaSortAmountDown className="text-gray-500" />
-                            <select
-                                value={sortBy}
-                                onChange={(e) => setSortBy(e.target.value)}
-                                className="border-gray-300 rounded-md text-sm focus:ring-primary focus:border-primary p-2 border"
-                            >
-                                <option value="popularity">Popularity</option>
-                                <option value="price-low">Price: Low to High</option>
-                                <option value="price-high">Price: High to Low</option>
-                            </select>
-                        </div>
+                {/* Products Grid */}
+                <div className="lg:w-3/4">
+                    {/* Sort and Results Count */}
+                    <div className="flex justify-between items-center mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                        <p className="text-gray-600 font-semibold">
+                            <span className="text-primary text-xl">{filteredProducts.length}</span> Products Found
+                        </p>
+                        <select
+                            value={sortBy}
+                            onChange={(e) => setSortBy(e.target.value)}
+                            className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-primary font-semibold"
+                        >
+                            <option value="popular">Most Popular</option>
+                            <option value="price-low">Price: Low to High</option>
+                            <option value="price-high">Price: High to Low</option>
+                            <option value="name">Name</option>
+                        </select>
                     </div>
 
                     {filteredProducts.length === 0 ? (
-                        <div className="text-center py-12">
-                            <h3 className="text-lg font-medium text-gray-900">No products found</h3>
-                            <p className="text-gray-500">Try adjusting your search or filters.</p>
+                        <div className="text-center py-16 bg-gray-50 rounded-2xl">
+                            <p className="text-2xl text-gray-400 mb-2">😔</p>
+                            <p className="text-gray-600 font-semibold">No products found</p>
+                            <p className="text-gray-500 text-sm">Try adjusting your filters</p>
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                             {filteredProducts.map((product) => (
-                                <div key={product.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
-                                    <div className="relative h-48 p-4 group">
-                                        <img
-                                            src={product.image}
-                                            alt={product.name}
-                                            className="w-full h-full object-contain group-hover:scale-105 transition-transform"
-                                        />
+                                <div key={product.id} className="bg-white rounded-2xl shadow-md border-2 border-gray-100 overflow-hidden hover:shadow-2xl hover:border-primary transition-all duration-300 transform hover:-translate-y-2 group">
+                                    {/* Product Image */}
+                                    <div className="relative bg-gray-50 p-6">
+                                        {product.discount && (
+                                            <span className="absolute top-3 left-3 bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg z-10">
+                                                {product.discount}% OFF
+                                            </span>
+                                        )}
                                         {product.prescriptionRequired && (
-                                            <span className="absolute top-2 right-2 bg-red-100 text-red-600 text-xs font-bold px-2 py-1 rounded">
+                                            <span className="absolute top-3 right-3 bg-orange-100 text-orange-700 text-xs font-bold px-3 py-1 rounded-full shadow-md z-10">
                                                 Rx Required
                                             </span>
                                         )}
+                                        <img
+                                            src={product.image}
+                                            alt={product.name}
+                                            className="w-full h-48 object-contain group-hover:scale-110 transition-transform duration-300"
+                                        />
                                     </div>
-                                    <div className="p-4">
-                                        <p className="text-xs text-gray-500 mb-1">{product.category}</p>
+
+                                    {/* Product Details */}
+                                    <div className="p-5">
+                                        <p className="text-xs text-gray-500 mb-1">{product.brand}</p>
                                         <Link to={`/product/${product.id}`}>
-                                            <h3 className="font-semibold text-gray-900 hover:text-primary mb-2 line-clamp-1">{product.name}</h3>
+                                            <h3 className="font-bold text-gray-900 hover:text-primary mb-2 line-clamp-2 text-sm">{product.name}</h3>
                                         </Link>
-                                        <div className="flex items-center justify-between mt-4">
-                                            <span className="text-lg font-bold text-primary">₹{product.price.toFixed(2)}</span>
-                                            <button
-                                                onClick={() => addToCart(product)}
-                                                className="px-4 py-2 bg-blue-50 text-blue-600 font-medium rounded-lg hover:bg-primary hover:text-white transition-colors text-sm"
-                                            >
-                                                Add to Cart
-                                            </button>
+
+                                        {/* Rating */}
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <div className="flex items-center bg-green-500 text-white px-2 py-1 rounded text-xs font-bold">
+                                                <span>★</span>
+                                                <span className="ml-1">{product.rating}</span>
+                                            </div>
+                                            <span className="text-xs text-gray-500">({product.reviews})</span>
                                         </div>
+
+                                        {/* Price */}
+                                        <div className="flex items-baseline gap-2 mb-4">
+                                            <span className="text-2xl font-bold text-primary">₹{product.price.toFixed(2)}</span>
+                                            {product.originalPrice && (
+                                                <span className="text-sm text-gray-400 line-through">₹{product.originalPrice.toFixed(2)}</span>
+                                            )}
+                                        </div>
+
+                                        {/* Stock & Express Delivery */}
+                                        <div className="flex items-center justify-between mb-4">
+                                            {product.inStock ? (
+                                                <span className="text-xs text-green-600 font-semibold">✓ In Stock</span>
+                                            ) : (
+                                                <span className="text-xs text-red-600 font-semibold">Out of Stock</span>
+                                            )}
+                                            {product.expressDelivery && (
+                                                <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded font-semibold">⚡ Express</span>
+                                            )}
+                                        </div>
+
+                                        {/* Add to Cart Button */}
+                                        <button
+                                            onClick={() => addToCart(product)}
+                                            className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-md hover:shadow-lg transform active:scale-95"
+                                        >
+                                            Add to Cart
+                                        </button>
                                     </div>
                                 </div>
                             ))}
